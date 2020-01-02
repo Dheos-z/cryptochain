@@ -1,0 +1,151 @@
+
+const express = require('express');
+const Blockchain = require('./blockchain');
+const bodyParser = require('body-parser');
+const PubSub = require('./app/pubsub');
+const request = require('request');
+const TransactionPool = require('./wallet/transaction-pool');
+const Wallet = require('./wallet');
+const TransactionMiner = require('./app/transaction-miner');
+const path = require('path');
+
+
+const app = express();
+const blockchain = new Blockchain();
+const wallet = new Wallet();
+const transactionPool = new TransactionPool();
+const pubsub = new PubSub({ blockchain, transactionPool });
+
+const DEFAULT_PORT = 3000;
+let PEER_PORT;
+const ROOT_NODE_ADDRESS = `http://localhost:${DEFAULT_PORT}`; // The root node is the node that starts the blockchain
+const transactionMiner = new TransactionMiner({ blockchain, transactionPool, wallet, pubsub });
+
+
+// Activate body-parser
+app.use(bodyParser.json());
+// Ask express to serve all the files in the client/dist directory
+app.use(express.static(path.join(__dirname, 'client/dist')));
+
+
+// Get the blocks of the blockchain 
+app.get('/api/blocks', (req, res) => { // request, response
+    res.json(blockchain.chain);
+});
+
+// Request to mine a block
+app.post('/api/mine', (req, res) => {
+    const { data } = req.body;
+
+    blockchain.addBlock({ data }); // addBlock => mineBlock (iterate to find the right nonce)
+
+    pubsub.broadcastChain();
+
+    // As a result of the mining, get the blocks of the chain
+    res.redirect('/api/blocks');
+});
+
+
+// Create a transaction
+app.post('/api/transact', (req, res) => {
+    const { amount, recipient } = req.body;
+    // console.log(`amout: ${amount}, recip: ${recipient}`);
+    let transaction = transactionPool.existingTransaction({ inputAddress: wallet.publicKey });
+
+    try {
+        if (transaction) {
+            transaction.update({ senderWallet: wallet, recipient, amount });
+        } else {
+            transaction = wallet.createTransaction({ recipient, amount, chain: blockchain.chain });
+        }
+    } catch (error) {
+        // 400 is the HTTP protocol error for this
+        return res.status(400).json({ type: 'error', message: error.message });
+    }
+
+    // Set transaction into the local transactionPool
+    transactionPool.setTransaction(transaction);
+
+    // Broadcast transaction to all other nodes 
+    pubsub.broadcastTransaction(transaction);
+
+    // type: success is the opposite of type: error
+    res.json({ type: 'success', transaction });
+});
+
+
+// Get the transaction pool
+app.get('/api/transaction-pool-map', (req, res) => {
+    res.json(transactionPool.transactionMap);
+});
+
+
+// Mine the transactions
+// /!\ Even if there are no transaction between users, it create a reward transaction and add a block
+app.get('/api/mine-transactions', (req, res) => {
+    transactionMiner.mineTransactions();
+    // minetransactions() : get valid transactions from the transaction pool,
+    // generate the miner's reward transaction, add block to the blockchain (which implies to mine the block),
+    // clear the transaction pool
+
+    res.redirect('/api/blocks');
+});
+
+
+// Get wallet info
+app.get('/api/wallet-info', (req, res) => {
+    const address = wallet.publicKey;
+
+    res.json({
+        address,
+        balance: Wallet.calculateBalance({ chain: blockchain.chain, address })
+    });
+});
+
+
+app.get('*', (req,res) => {
+    res.sendFile(path.join(__dirname, 'client/dist/index.html'));
+});
+
+
+
+// Request to synchronize chain with the chain of the root
+// (Useful when a node gets into the network and has a incomplete chain)
+const syncWithRootState = () => {
+    request({ url: `${ROOT_NODE_ADDRESS}/api/blocks` }, (error, response, body) => {
+        if (!error && response.statusCode === 200) { // 200 is the success of GET request in the HTTP protocol
+            const rootChain = JSON.parse(body); // Convert a JavaScript Object Notation (JSON) string to a JS object
+
+            // Ask to replace the chain
+            console.log('replace chain on a sync with', rootChain);
+            blockchain.replaceChain(rootChain);
+        }
+    });
+
+    request({ url: `${ROOT_NODE_ADDRESS}/api/transaction-pool-map` }, (error, response, body) => {
+        if (!error && response.statusCode === 200) {
+            const rootTransactionPoolMap = JSON.parse(body);
+
+            // Ask to replace the transaction pool
+            console.log('replace transaction pool map on a sync with', rootTransactionPoolMap);
+            transactionPool.setMap(rootTransactionPoolMap);
+        }
+    });
+}
+
+
+if (process.env.GENERATE_PEER_PORT === 'true') {
+    PEER_PORT = DEFAULT_PORT + Math.ceil(Math.random() * 1000);
+}
+
+// listen to requests
+const PORT = PEER_PORT || DEFAULT_PORT;
+app.listen(PORT, () => {
+    console.log(`listening at localhost:${PORT}`);
+
+    // Sync chain with the chain of the root
+    // only if this node is not the root, to avoid redundancy
+    if (PORT !== DEFAULT_PORT) {
+        syncWithRootState();
+    }
+});
