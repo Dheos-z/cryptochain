@@ -36,6 +36,10 @@ body {
     padding: 5%;
 }
 
+.ConductTransaction {
+    margin:10%;
+}
+
 /* the a tag (anchor) is sort of the parent of the React Link tag, so we can use CSS
 on the a tag to see changes on the Link tag */
 a, a:hover {
