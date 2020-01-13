@@ -1,21 +1,35 @@
-import React, {Component} from 'react';
-import {FormGroup, FormControl} from 'react-bootstrap';
-import {Link} from 'react-router-dom';
+import React, { Component } from 'react';
+import { FormGroup, FormControl, Button } from 'react-bootstrap';
+import { Link } from 'react-router-dom';
+import history from '../history';
 
 class ConductTransaction extends Component {
-    state={recipient: '', amount:0};
+    state = { recipient: '', amount: 0 };
 
     updateRecipient = event => {
-        this.setState({recipient: event.target.value});
+        this.setState({ recipient: event.target.value });
     }
 
     updateAmount = event => {
-        this.setState({amount: Number(event.target.value)});
+        this.setState({ amount: Number(event.target.value) });
+    }
+
+    conductTransaction = () => {
+        const { recipient, amount } = this.state;
+
+        // fetch is used to interact with the API
+        fetch(`${document.location.origin}/api/transact`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient, amount })
+        }).then(response => response.json())
+            .then(json => {
+                alert(json.message || json.type);
+                history.push('/transaction-pool'); // Push the user to a Link
+            });
     }
 
     render() {
-        console.log('this.state', this.state);
-
         return (
             <div className='ConductTransaction'>
                 <Link to='/'>Home</Link>
@@ -30,12 +44,20 @@ class ConductTransaction extends Component {
                 </FormGroup>
                 <FormGroup>
                     <FormControl
-                            input='number'
-                            placeholder='amount'
-                            value={this.state.amount}
-                            onChange={this.updateAmount}
+                        input='number'
+                        placeholder='amount'
+                        value={this.state.amount}
+                        onChange={this.updateAmount}
                     />
                 </FormGroup>
+                <div>
+                    <Button
+                        bsstyle="danger"
+                        onClick={this.conductTransaction}
+                    >
+                        Submit
+                    </Button>
+                </div>
             </div>
         )
     }

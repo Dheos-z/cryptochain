@@ -1,14 +1,14 @@
 // Curly braces ({Component}) -> not a default export
 // No curly braces (React) -> default export
 import React, { Component } from 'react';
-import {Button} from 'react-bootstrap';
+import { Button } from 'react-bootstrap';
 import Transaction from './Transaction';
 
 class Block extends Component {
-    state = {displayTransaction: false};
+    state = { displayTransaction: false };
 
     toggleTransaction = () => {
-        this.setState({displayTransaction: !this.state.displayTransaction});
+        this.setState({ displayTransaction: !this.state.displayTransaction });
     }
 
     // Instead of a get method, we could have used a function (displayTransaction = () => {...}), but
@@ -22,37 +22,37 @@ class Block extends Component {
         const dataDisplay = stringifiedData.length > 35 ?
             `${stringifiedData.substring(0, 35)}...` :
             stringifiedData;
-        
-            if(this.state.displayTransaction) {
-                return (
-                    <div>
-                        {
-                            data.map(transaction => (
-                                <div key={transaction.id}>
-                                    <hr/>
-                                    {/* Pass the transaction to the props so it can be used in Transaction.js : */}
-                                    <Transaction transaction={transaction} />
-                                </div>
-                            ))
-                        }
-                        <br/>
-                        <Button
-                            bsStyle="danger"
-                            bsSize="small"
-                            onClick={this.toggleTransaction}
-                        >
-                            Show Less
+
+        if (this.state.displayTransaction) {
+            return (
+                <div>
+                    {
+                        data.map(transaction => (
+                            <div key={transaction.id}>
+                                <hr />
+                                {/* Pass the transaction to the props so it can be used in Transaction.js : */}
+                                <Transaction transaction={transaction} />
+                            </div>
+                        ))
+                    }
+                    <br />
+                    <Button
+                        bsstyle="danger"
+                        bsSize="small"
+                        onClick={this.toggleTransaction}
+                    >
+                        Show Less
                         </Button>
-                    </div>
-                );
-            }
+                </div>
+            );
+        }
 
         return (
             <div>
                 <div>Data : {dataDisplay}</div>
-                <Button 
-                    bsStyle="danger" 
-                    bsSize="small" 
+                <Button
+                    bsstyle="danger"
+                    bsSize="small"
                     onClick={this.toggleTransaction}
                 >
                     Show More
