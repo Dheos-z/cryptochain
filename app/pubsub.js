@@ -7,12 +7,12 @@ const CHANNELS = {
 
 
 class PubSub {
-    constructor({ blockchain, transactionPool }) {
+    constructor({ blockchain, transactionPool, redisUrl }) {
         this.blockchain = blockchain;
         this.transactionPool = transactionPool;
         // We want the node to be both a publisher and a subscriber
-        this.publisher = redis.createClient();
-        this.subscriber = redis.createClient();
+        this.publisher = redis.createClient(redisUrl);
+        this.subscriber = redis.createClient(redisUrl);
         // Subscribe to all the channels
         this.subscribeToChannels();
 

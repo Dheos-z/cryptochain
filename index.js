@@ -9,17 +9,24 @@ const Wallet = require('./wallet');
 const TransactionMiner = require('./app/transaction-miner');
 const path = require('path');
 
+// Check if we are in development mode
+const isDevelopment = process.env.ENV === 'development';
+
+const REDIS_URL = isDevelopment ?
+    // Connect to the local default redis server if development mode (uses redis protocol, localhost address and default redis port 6379)
+    'redis://127.0.0.1:6379' :
+    // Connect to the redis server given by Heroku
+    'redis://h:p3d948107971e8b2e9f67d161c06d27f6a50f3d651883e7b642bd77e27b24bb86@ec2-54-164-76-107.compute-1.amazonaws.com:16499';
+const DEFAULT_PORT = 3000;
+const ROOT_NODE_ADDRESS = `http://localhost:${DEFAULT_PORT}`; // The root node is the node that starts the blockchain
 
 const app = express();
 const blockchain = new Blockchain();
 const wallet = new Wallet();
 const transactionPool = new TransactionPool();
-const pubsub = new PubSub({ blockchain, transactionPool });
-
-const DEFAULT_PORT = 3000;
-let PEER_PORT;
-const ROOT_NODE_ADDRESS = `http://localhost:${DEFAULT_PORT}`; // The root node is the node that starts the blockchain
+const pubsub = new PubSub({ blockchain, transactionPool, redisUrl: REDIS_URL });
 const transactionMiner = new TransactionMiner({ blockchain, transactionPool, wallet, pubsub });
+
 
 
 // Activate body-parser
@@ -133,54 +140,61 @@ const syncWithRootState = () => {
     });
 }
 
-// Seed the app with initial data
-const walletFoo = new Wallet();
-const walletBar = new Wallet();
 
-const generateWalletTransaction = ({ wallet, recipient, amount }) => {
-    const transaction = wallet.createTransaction({
-        recipient, amount, chain: blockchain.chain
+// If development mode, seed the app with initial data
+if (isDevelopment) {
+    const walletFoo = new Wallet();
+    const walletBar = new Wallet();
+
+    const generateWalletTransaction = ({ wallet, recipient, amount }) => {
+        const transaction = wallet.createTransaction({
+            recipient, amount, chain: blockchain.chain
+        });
+
+        transactionPool.setTransaction(transaction);
+    };
+
+    const walletAction = () => generateWalletTransaction({
+        wallet, recipient: walletFoo.publicKey, amount: 5
     });
 
-    transactionPool.setTransaction(transaction);
-};
+    const walletFooAction = () => generateWalletTransaction({
+        wallet: walletFoo, recipient: walletBar.publicKey, amount: 10
+    });
 
-const walletAction = () => generateWalletTransaction({
-    wallet, recipient: walletFoo.publicKey, amount: 5
-});
+    const walletBarAction = () => generateWalletTransaction({
+        wallet: walletBar, recipient: wallet.publicKey, amount: 15
+    });
 
-const walletFooAction = () => generateWalletTransaction({
-    wallet: walletFoo, recipient: walletBar.publicKey, amount: 10
-});
+    for (let i = 0; i < 10; i++) {
+        if (i % 3 === 0) {
+            walletAction();
+            walletFooAction();
+        }
+        else if (i % 3 === 1) {
+            walletAction();
+            walletBarAction();
+        }
+        else {
+            walletFooAction();
+            walletBarAction();
+        }
 
-const walletBarAction = () => generateWalletTransaction({
-    wallet: walletBar, recipient: wallet.publicKey, amount: 15
-});
-
-for (let i = 0; i < 10; i++) {
-    if (i % 3 === 0) {
-        walletAction();
-        walletFooAction();
-    }
-    else if (i % 3 === 1) {
-        walletAction();
-        walletBarAction();
-    }
-    else {
-        walletFooAction();
-        walletBarAction();
+        transactionMiner.mineTransactions();
     }
 
-    transactionMiner.mineTransactions();
 }
 
+let PEER_PORT;
 
 if (process.env.GENERATE_PEER_PORT === 'true') {
     PEER_PORT = DEFAULT_PORT + Math.ceil(Math.random() * 1000);
 }
 
 // listen to requests
-const PORT = PEER_PORT || DEFAULT_PORT;
+
+// We want Heroku to have complete control over the ports
+const PORT = process.env.PORT || PEER_PORT || DEFAULT_PORT;
 app.listen(PORT, () => {
     console.log(`listening at localhost:${PORT}`);
 
