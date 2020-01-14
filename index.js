@@ -182,7 +182,6 @@ if (isDevelopment) {
 
         transactionMiner.mineTransactions();
     }
-
 }
 
 let PEER_PORT;
