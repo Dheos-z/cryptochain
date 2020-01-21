@@ -40,6 +40,28 @@ app.get('/api/blocks', (req, res) => { // request, response
     res.json(blockchain.chain);
 });
 
+
+// Pagination of the blocks
+app.get('/api/blocks/length', (req, res) => {
+    res.json(blockchain.chain.length);
+});
+
+app.get('/api/blocks/:id', (req, res) => {
+    const { id } = req.params;
+    const { length } = blockchain.chain;
+
+    // slice() returns a copy of the variable, reverse() reverses the elements of the given array
+    const blocksReversed = blockchain.chain.slice().reverse();
+
+    let startIndex = (id - 1) * 5;
+    let endIndex = id * 5;
+
+    startIndex = startIndex < length ? startIndex : length;
+    endIndex = endIndex < length ? endIndex : length;
+
+    res.json(blocksReversed.slice(startIndex, endIndex));
+});
+
 // Request to mine a block
 app.post('/api/mine', (req, res) => {
     const { data } = req.body;
@@ -110,6 +132,22 @@ app.get('/api/wallet-info', (req, res) => {
 });
 
 
+// Get all the addresses that were involved in a transaction (sender or recipient)
+app.get('/api/known-addresses', (req, res) => {
+    const addressMap = {};
+
+    for (let block of blockchain.chain) {
+        for (let transaction of block.data) {
+            const recipient = Object.keys(transaction.outputMap); // recipient is an array of addresses
+
+            recipient.forEach(recipient => addressMap[recipient] = recipient); // every recipient is added to the map
+        }
+    }
+
+    res.json(Object.keys(addressMap));
+});
+
+
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'client/dist/index.html'));
 });
@@ -166,7 +204,7 @@ if (isDevelopment) {
         wallet: walletBar, recipient: wallet.publicKey, amount: 15
     });
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 20; i++) {
         if (i % 3 === 0) {
             walletAction();
             walletFooAction();
@@ -192,7 +230,7 @@ if (process.env.GENERATE_PEER_PORT === 'true') {
 
 // listen to requests
 
-// We want Heroku to have complete control over the ports
+// We want Heroku to have complete control over the overall port
 const PORT = process.env.PORT || PEER_PORT || DEFAULT_PORT;
 app.listen(PORT, () => {
     console.log(`listening at localhost:${PORT}`);
