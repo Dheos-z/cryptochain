@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import logo from '../assets/logo.jpg'; // Import the logo as a JS object
+import coin from '../assets/coin.gif'; // Import the logo as a JS object
 import { Link } from 'react-router-dom';
 
 class App extends Component {
@@ -17,11 +17,11 @@ class App extends Component {
 
         return (
             <div className='App'>
-                <img className='logo' src={logo}></img>
+                <h1>
+                    The Zedcoin
+                </h1>
+                <img className='logo' src={coin}></img>
                 <br />
-                <div>
-                    Welcome to the Zedcoin blockchain...
-                </div>
                 <br />
                 <div><Link to='/blocks'>Blocks</Link></div>
                 <div><Link to='/conduct-transaction'>Conduct a transaction</Link></div>
